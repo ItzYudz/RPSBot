@@ -3,15 +3,55 @@ const { Client } = require('photop-client')
 const client = new Client({ username: 'RPS', password: process.env['Pass'] })
 
 const JSONdb = require('simple-json-db')
+
 const db = new JSONdb('storage.json')
-const START = 'playrps'
+
+const START = 'rps!start'
+
 const STARTTEXT = 'Started RPS! chat "rps!play" to play!'
+
 const TIME = 120000
+
 const PREFIX = 'rps!'
-const WrongCommand = 'wrong command bozo'
+
 const choices = ["rock", "paper", "scissors"]
+
 function getRandomInt(max) {
   return Math.floor(Math.random() * max);
+}
+
+function getAI(player, ai) {
+  switch (player) {
+    case 'p':
+      switch (ai) {
+        case 'scissors':
+          return 'lose'
+        case 'rock':
+          return 'win'
+        case 'paper':
+          return 'tie'
+      }
+      break;
+    case 'r':
+      switch (ai) {
+        case 'scissors':
+          return 'win'
+        case 'paper':
+          return 'lose'
+        case 'rock':
+          return 'tie'
+      }
+      break;
+    case 's':
+      switch (ai) {
+        case 'scissors':
+          return 'tie'
+        case 'paper':
+          return 'win'
+        case 'rock':
+          return 'lose'
+      }
+  }
 }
 
 function getCom(c) {
@@ -19,64 +59,54 @@ function getCom(c) {
     case 'play':
       return {
         name: 'play',
-        func: ({ chat, body, args: [h], data }) => {
+        func: async ({ chat, body, args: [h], data }) => {
           const d = JSON.parse(db.get(chat.author.id))
           var ai = (`${choices[getRandomInt(choices.length)]}`)
-          if (body == "") {
+          if (body == undefined && body != '') {
             chat.reply(`You need to provide a body (aka choice) ex: r (standing for rock)`)
+          } else {
+            const game = await getAI(body, ai)
+            let t;
+            switch (game) {
+              case 'tie':
+                t = `You tied... | Opponent: ${ai}`
+                break;
+              case 'lose': //just a second brb ok
+                if (d.chance2 == false) {
+                  t = `You lost... | Opponent: ${ai}`
+                  d.points -= 10
+                } else {
+                  t = `You lost... | Opponent: ${ai} | (Your extraEXP was used.)`
+                  d.points -= 5
+                }
+                break;
+              case 'win':
+                if (d.chance2 == false) {
+                  t = `You won! | Opponent: ${ai}`
+                  d.points += 15
+                } else {
+                  t = `You won! | Opponent: ${ai} | (Your extraEXP was used.)`
+                  d.points += 20
+                }
+                break;
+            }
+            setTimeout(function() {
+              chat.reply(t)
+              d.matches += 1
+              db.set(chat.author.id, JSON.stringify(d))
+            }, 1000)
           }
-          if (body == "r" && ai == "paper") {
-            chat.reply(`You lose... Opponent: ` + ai)
-            d.points -= 10
-          }
-          if (body == "r" && ai == "scissors") {
-            chat.reply(`You win! Opponent: ` + ai)
-            d.points += 15
-          }
-          if (body == "r" && ai == "rock") {
-            chat.reply(`You tied... Opponent: ` + ai)
-            d.points += 5
-          }
-          if (body == "p" && ai == "scissors") {
-            chat.reply(`You lose... Opponent: ` + ai)
-            d.points -= 10
-          }
-          if (body == "p" && ai == "rock") {
-            chat.reply(`You win! Opponent: ` + ai)
-            d.points += 15
-          }
-          if (body == "p" && ai == "paper") {
-            chat.reply(`You tied... Opponent: ` + ai)
-            d.points += 5
-          }
-          if (body == "s" && ai == "rock") {
-            chat.reply(`You lose... Opponent: ` + ai)
-            d.points -= 10
-          }
-          if (body == "s" && ai == "paper") {
-            chat.reply(`You win! Opponent: ` + ai)
-            d.points += 15
-          }
-          if (body == "s" && ai == "scissors") {
-            chat.reply(`You tied... Opponent: ` + ai)
-            d.points += 5
-          }
-          d.matches += 1
-          if (body != "r" & body != "p" && body != "s" && body != "") {
-            chat.reply(`Unidentified body... the options are r, p, or s.`)
-          }
-          db.set(chat.author.id, JSON.stringify(d))
-          //use db.set(chat.author.id, JSON.stringify(data)) when you are changing data (only after the data is added. I recommend a timeout)
         }
       }
     case 'stats':
       return {
         name: 'stats',
         func: ({ chat, body, args: [h], data }) => {
-          if (data.matches > 0) {
-            chat.reply(`Stats for ${chat.author.username}: Matches played: ${data.matches}, Points: ${data.points}, Level: ${data.level}. You earn 15 points if you win, 5 points if you tie, and -10 points if you lose.`)
+          const d = JSON.parse(db.get(chat.author.id))
+          if (d.matches > 0) {
+            chat.reply(`Stats for ${chat.author.username}: Matches played: ${d.matches}, Points: ${d.points}, Level: ${d.level}. You earn 15 points if you win, 5 points if you tie, and -10 points if you lose.`)
           }
-          if (data.matches == null) {
+          if (d.matches == 0) {
             chat.reply(`You haven't played any matches! start playing with the command "play".`)
           }
         }
@@ -84,77 +114,76 @@ function getCom(c) {
     case 'levelup':
       return {
         name: 'levelup',
-        func: ({ chat, body, args: [h], data }) => {
+        func: async ({ chat, body, args: [h], data }) => {
           const d = JSON.parse(db.get(chat.author.id))
-          if (data.level == null && data.points > 100) {
-            d.level = 2
-            chat.reply(`Leveled up from 1 to 2`)
-          }
-          if (data.level == 2 && data.points > 150) {
-            d.level = 3
-            chat.reply(`Leveled up from 2 to 3`)
-          }
-          if (data.level == 3 && data.points > 200) {
-            d.level = 4
-            chat.reply(`Leveled up from 3 to 4`)
-          }
-          if (data.level == 4 && data.points > 300) {
-            d.level = 5
-            chat.reply(`Leveled up from 4 to 5`)
-          }
-          if (data.level == 5 && data.points > 400) {
-            d.level = 6
-            chat.reply(`Leveled up from 5 to 6`)
-          }
-          if (data.level == 6 && data.points > 500) {
-            d.level = 7
-            chat.reply(`Leveled up from 6 to 7`)
-          }
-          if (data.level == 7 && data.points > 650) {
-            d.level = 8
-            chat.reply(`Leveled up from 7 to 8`)
-          }
-          if (data.level == 8 && data.points > 800) {
-            d.level = 9
-            chat.reply(`Leveled up from 8 to 9`)
-          }
-          if (data.level == 9 && data.points > 1000) {
-            d.level = 10
-            chat.reply(`Leveled up from 9 to 10`)
+          const exp = d.level * 50
+          if (d.points >= exp) {
+            chat.reply(`Leveled up from ${d.level} to ${d.level + 1}`)
+            d.level += 1
           }
           db.set(chat.author.id, JSON.stringify(d))
+        }
+      }
+    case 'shop':
+      return {
+        name: 'shop',
+        func: ({ chat, body, args: [h], data }) => {
+          chat.reply(`Shop items: Extra Points. Instead of losing and subtracting 10, you only subtract 5, and when you win, instead of 15 points, you get 20! ID: extraEXP, Cost: 250 points.`)
+        }
+      }
+    case 'buy':
+      return {
+        name: 'buy',
+        func: ({ chat, body, args: [h], data }) => {
+          const d = JSON.parse(db.get(chat.author.id))
+          if (body == undefined) {
+            chat.reply("You need to provide something to buy! Run the shop command for items.")
+          }
+          if (body == "extraEXP" && d.points >= 250) {
+            d.points -= 250
+            d.extraEXP = true
+            chat.reply("Bought Extra Points item!")
+            db.set(chat.author.id, JSON.stringify(d))
+          } else {
+            chat.reply("Couldn't buy item... Likely reason: Not enough points. Run the command again if you think this is an error.")
+          }
         }
       }
     case 'help':
       return {
         name: 'help',
         func: ({ chat, body, args: [h], data }) => {
-          if (body == "") {
+          if (body == undefined) {
             chat.reply(`Not a valid command.`)
           }
           if (body == "levels") {
-            chat.reply(`100 points = level 2, 150 = 3, 200 = 4, 300 = 5, 400 = 6, 500 = 7, 650 = 8, 800 = 9, 1000 = 10.`)
+            chat.reply(`Level 2 is 50 points, 3 is 50, 4 is 150, and so on.`)
           }
           if (body == "stats") {
-            chat.reply(`Use the command. It's pretty self explanitory.`)
+            chat.reply(`Shows your stats. Use the command. It's pretty self explanitory.`)
           }
         }
       }
   }
 }
 
-const Version = 2.11//this cant be in a decimal, it can only be a whole number
+const Version = 3
 
-const defaultData = {//this data is for the new user
-  version: 2.11//the starting version (1 for now)
+const defaultData = {
+  version: 3,
+  level: 1,
+  points: 0,
+  matches: 0,
+  extraEXP: false
 }
 
 async function VersionUpdate(uid) {
   const d = JSON.parse(await db.get(uid))
   switch (d.version) {
-    case 1://the version that people need to update their account
-      d.lvl = 2.11//the data added
-      db.set(uid, JSON.stringify(d))//use this whenever you are saving an account update
+    case 3:
+      d.version = 3
+      d.extraEXP = false
+      db.set(uid, JSON.stringify(d))
       break;
   }
 }
@@ -167,7 +196,7 @@ client.onPost = async (post) => {
     const resettime = await post.connect(TIME, () => {
       post.onChat = () => { };
       if (post.text == START) {
-        post.chat("Disconnected because of inactivity. My waiting limit is 2 minutes!")
+        post.chat("I have disconnected because it has been 2 minutes since you used a command.")
       }
     })
     resettime()
@@ -193,11 +222,11 @@ client.onPost = async (post) => {
             if (getCom(commandname) != undefined) {
               getCom(commandname).func(context)
             } else {
-              chat.reply(WrongCommand)
+              chat.reply(`Couldn't find command... Make sure that your spelling is correct.`)
             }
           }, 111)
         } else {
-          chat.reply(`no command?`)
+          chat.reply(`You must provide a command to use! Run rps!help for help!`)
         }
       }
     }
@@ -205,22 +234,11 @@ client.onPost = async (post) => {
 }
 
 client.onReady = () => {
-  if (START == undefined || START == '') {
-    throw new Error(`Your 'START' variable cant be empty...`)
-  }
-  if (STARTTEXT == undefined || STARTTEXT == '') {
-    throw new Error(`Your 'STARTTEXT' variable cant be empty...`)
-  }
-  if (PREFIX == undefined || PREFIX == '') {
-    throw new Error(`Your 'PREFIX' variable cant be empty...`)
-  }
-  if (TIME == undefined || TIME == '' || TIME < 30000) {
-    throw new Error(`Your 'TIME' variable cant be less than 30000 milliseconds...`)
-  }
-  if (WrongCommand == undefined || WrongCommand == '') {
-    throw new Error(`Your 'WrongCommand' variable cant be empty...`)
-  }
-
-  console.log(`Bot is ready!`)
+  let interval = setInterval(() => {
+    if (client._network.simpleSocket.secureID) {
+      console.log("Bot is ready!")
+      clearInterval(interval)
+    }
+  }, 100)
 }
 require('http').createServer((req, res) => res.end('online and running on app.photop.live')).listen(3000)
