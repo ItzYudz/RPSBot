@@ -72,7 +72,7 @@ function getCom(c) {
                 t = `You tied... | Opponent: ${ai}`
                 break;
               case 'lose': //just a second brb ok
-                if (d.chance2 == false) {
+                if (d.extraEXP == false) {
                   t = `You lost... | Opponent: ${ai}`
                   d.points -= 10
                 } else {
@@ -81,7 +81,7 @@ function getCom(c) {
                 }
                 break;
               case 'win':
-                if (d.chance2 == false) {
+                if (d.extraEXP == false) {
                   t = `You won! | Opponent: ${ai}`
                   d.points += 15
                 } else {
@@ -167,10 +167,10 @@ function getCom(c) {
   }
 }
 
-const Version = 3
+const Version = 4
 
 const defaultData = {
-  version: 3,
+  version: 4,
   level: 1,
   points: 0,
   matches: 0,
@@ -180,8 +180,8 @@ const defaultData = {
 async function VersionUpdate(uid) {
   const d = JSON.parse(await db.get(uid))
   switch (d.version) {
-    case 3:
-      d.version = 3
+    case 4:
+      d.version = 4
       d.extraEXP = false
       db.set(uid, JSON.stringify(d))
       break;
